@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0] - 2026-05-30
+
+### Added
+- Standalone API Keys management (separate from users)
+- API Keys page under Config dropdown with name, permission, expiration
+- Read-only vs full access permission levels for API keys
+- Optional expiration date on API keys
+- Config dropdown menu (General, Users, API Keys)
+
+### Changed
+- API authentication now uses standalone keys instead of user-tied keys
+- Nav restructured: Config is now a dropdown
+- Login form has autocomplete attributes for password managers (Bitwarden etc)
+
+### Removed
+- "Gen API Key" button from Users page (replaced by API Keys page)
+
 ## [1.1.0] - 2026-05-30
 
 ### Added

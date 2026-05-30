@@ -9,6 +9,12 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 DB_PATH = os.environ.get('DB_PATH', '/data/dns_proxy_manager.db')
 
 
+@app.template_filter('timestamp')
+def timestamp_filter(ts):
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
+
+
 # --- Database ---
 
 def get_db():
@@ -36,10 +42,18 @@ def init_db():
             domain TEXT NOT NULL,
             requested_at REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            key TEXT UNIQUE NOT NULL,
+            permission TEXT NOT NULL DEFAULT 'read',
+            created_at REAL NOT NULL,
+            expires_at REAL
+        );
     ''')
     # Add api_key column if upgrading
     try:
-        db.execute('ALTER TABLE users ADD COLUMN api_key TEXT UNIQUE')
+        db.execute('ALTER TABLE users ADD COLUMN api_key TEXT')
     except Exception:
         pass
     db.commit()
@@ -90,10 +104,13 @@ def api_key_required(f):
         if not key:
             return jsonify({'error': 'Missing X-API-Key header'}), 401
         db = get_db()
-        user = db.execute('SELECT * FROM users WHERE api_key=?', (key,)).fetchone()
+        row = db.execute('SELECT * FROM api_keys WHERE key=?', (key,)).fetchone()
         db.close()
-        if not user:
+        if not row:
             return jsonify({'error': 'Invalid API key'}), 401
+        if row['expires_at'] and row['expires_at'] < time.time():
+            return jsonify({'error': 'API key expired'}), 401
+        request.api_permission = row['permission']
         return f(*args, **kwargs)
     return decorated
 
@@ -662,16 +679,44 @@ def setup():
     return render_template('setup.html')
 
 
-@app.route('/config/users/apikey/<int:user_id>', methods=['POST'])
+@app.route('/config/apikeys')
 @admin_required
-def generate_api_key(user_id):
+def config_apikeys():
+    db = get_db()
+    keys = db.execute('SELECT * FROM api_keys ORDER BY created_at DESC').fetchall()
+    db.close()
+    return render_template('apikeys.html', keys=keys, now=time.time())
+
+
+@app.route('/config/apikeys/add', methods=['POST'])
+@admin_required
+def add_api_key():
+    name = request.form['name'].strip()
+    permission = request.form.get('permission', 'read')
+    expires = request.form.get('expires_at', '').strip()
+    expires_at = None
+    if expires:
+        import datetime
+        expires_at = datetime.datetime.strptime(expires, '%Y-%m-%d').timestamp()
     key = secrets.token_urlsafe(32)
     db = get_db()
-    db.execute('UPDATE users SET api_key=? WHERE id=?', (key, user_id))
+    db.execute('INSERT INTO api_keys (name, key, permission, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+               (name, key, permission, time.time(), expires_at))
     db.commit()
     db.close()
-    flash(f'API key generated: {key}', 'success')
-    return redirect(url_for('config_users'))
+    flash(f'API key created: {key}', 'success')
+    return redirect(url_for('config_apikeys'))
+
+
+@app.route('/config/apikeys/delete/<int:key_id>', methods=['POST'])
+@admin_required
+def delete_api_key(key_id):
+    db = get_db()
+    db.execute('DELETE FROM api_keys WHERE id=?', (key_id,))
+    db.commit()
+    db.close()
+    flash('API key revoked', 'success')
+    return redirect(url_for('config_apikeys'))
 
 
 # --- REST API ---
@@ -720,6 +765,8 @@ def api_list_fqdns():
 @app.route('/api/fqdns', methods=['POST'])
 @api_key_required
 def api_create_fqdn():
+    if request.api_permission != 'full':
+        return jsonify({'error': 'API key does not have write permission'}), 403
     data = request.get_json()
     if not data:
         return jsonify({'error': 'JSON body required'}), 400
@@ -764,6 +811,8 @@ def api_create_fqdn():
 @app.route('/api/fqdns/<domain>', methods=['DELETE'])
 @api_key_required
 def api_delete_fqdn(domain):
+    if request.api_permission != 'full':
+        return jsonify({'error': 'API key does not have write permission'}), 403
     pihole._auth()
     npm._auth()
 

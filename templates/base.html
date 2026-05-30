@@ -11,8 +11,14 @@
     {% if session.get('user_id') %}
     <nav>
         <a href="{{ url_for('home') }}">Home</a>
-        <a href="{{ url_for('config_page') }}">Config</a>
-        <a href="{{ url_for('config_users') }}">Users</a>
+        <div class="nav-dropdown">
+            <a href="{{ url_for('config_page') }}">Config ▾</a>
+            <div class="nav-dropdown-content">
+                <a href="{{ url_for('config_page') }}">General</a>
+                <a href="{{ url_for('config_users') }}">Users</a>
+                <a href="{{ url_for('config_apikeys') }}">API Keys</a>
+            </div>
+        </div>
         <span class="nav-right">{{ session.username }} ({{ session.role }}) | <a href="{{ url_for('logout') }}">Logout</a></span>
     </nav>
     {% endif %}

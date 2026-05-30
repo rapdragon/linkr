@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Linkr — API Keys{% endblock %}
+{% block content %}
+<h1>API Keys</h1>
+<table>
+    <thead><tr><th>Name</th><th>Key</th><th>Permission</th><th>Created</th><th>Expires</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% for k in keys %}
+        <tr>
+            <td>{{ k.name }}</td>
+            <td><code>{{ k.key[:8] }}...{{ k.key[-4:] }}</code></td>
+            <td>{{ k.permission }}</td>
+            <td>{{ k.created_at | int | timestamp }}</td>
+            <td>
+                {% if k.expires_at %}
+                    {% if k.expires_at < now %}
+                    <span class="status-missing">Expired</span>
+                    {% else %}
+                    {{ k.expires_at | int | timestamp }}
+                    {% endif %}
+                {% else %}
+                Never
+                {% endif %}
+            </td>
+            <td>
+                <form method="post" action="{{ url_for('delete_api_key', key_id=k.id) }}" style="display:inline"
+                      onsubmit="return confirm('Revoke this API key?')">
+                    <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Create API Key</h2>
+<form method="post" action="{{ url_for('add_api_key') }}">
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" placeholder="e.g. kiro, automation" required>
+    </div>
+    <div class="form-group">
+        <label>Permission</label>
+        <select name="permission">
+            <option value="read">Read only</option>
+            <option value="full">Full access (read + write)</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Expires (optional)</label>
+        <input type="date" name="expires_at">
+    </div>
+    <button type="submit" class="btn">Create Key</button>
+</form>
+{% endblock %}
