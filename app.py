@@ -1,8 +1,13 @@
-import os, sqlite3, secrets, time, socket
+import os, sqlite3, secrets, time, socket, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import requests as req
 import bcrypt
+from cryptography import x509
+from cryptography.x509.oid import NameOID, ExtensionOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -275,11 +280,85 @@ class NPMAPI:
                 return h['id']
         return None
 
+    def upload_custom_cert(self, nice_name, cert_pem, key_pem):
+        """Upload custom cert via multipart form and place files on disk."""
+        if not self._auth():
+            return None
+        url = f"{self._url()}/api/nginx/certificates"
+        headers = {'Authorization': f'Bearer {self.token}'}
+        r = req.post(url, headers=headers, files={
+            'nice_name': (None, nice_name),
+            'provider': (None, 'other'),
+            'certificate': ('fullchain.pem', cert_pem, 'application/x-pem-file'),
+            'certificate_key': ('privkey.pem', key_pem, 'application/x-pem-file'),
+        }, timeout=10)
+        if not r.ok:
+            return None
+        cert_data = r.json()
+        cert_id = cert_data.get('id')
+        if not cert_id:
+            return None
+        # Write cert files to NPM custom_ssl directory
+        cert_dir = os.path.join(os.environ.get('NPM_CERTS_PATH', '/npm_certs'), f'npm-{cert_id}')
+        os.makedirs(cert_dir, exist_ok=True)
+        ca_path = os.environ.get('CA_PATH', '/ca')
+        ca_cert = open(os.path.join(ca_path, 'ca.crt')).read()
+        with open(os.path.join(cert_dir, 'fullchain.pem'), 'w') as f:
+            f.write(cert_pem + ca_cert)
+        with open(os.path.join(cert_dir, 'chain.pem'), 'w') as f:
+            f.write(ca_cert)
+        with open(os.path.join(cert_dir, 'privkey.pem'), 'w') as f:
+            f.write(key_pem)
+        return cert_id
+
     def test_connection(self):
         try:
             return self._auth()
         except Exception:
             return False
+
+
+def generate_internal_cert(domain, forward_host=None):
+    """Generate a cert signed by the internal CA."""
+    ca_path = os.environ.get('CA_PATH', '/ca')
+    ca_cert_pem = open(os.path.join(ca_path, 'ca.crt'), 'rb').read()
+    ca_key_pem = open(os.path.join(ca_path, 'ca.key'), 'rb').read()
+    ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+    ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+
+    san_names = [x509.DNSName(domain)]
+    if forward_host:
+        try:
+            import ipaddress
+            san_names.append(x509.IPAddress(ipaddress.ip_address(forward_host)))
+        except ValueError:
+            pass
+
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, domain)])
+    now = datetime.datetime.utcnow()
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca_cert.subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=825))
+        .add_extension(x509.SubjectAlternativeName(san_names), critical=False)
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(x509.KeyUsage(digital_signature=True, key_encipherment=True,
+                                     content_commitment=False, data_encipherment=False,
+                                     key_agreement=False, key_cert_sign=False,
+                                     crl_sign=False, encipher_only=False, decipher_only=False), critical=True)
+        .sign(ca_key, hashes.SHA256(), default_backend())
+    )
+
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+                                serialization.NoEncryption()).decode()
+    return cert_pem, key_pem
 
 
 pihole = PiHoleAPI()
@@ -414,6 +493,16 @@ def add_fqdn():
                 record_cert_request(domain)
             else:
                 flash('Warning: cert request may have failed. Proxy created without SSL.', 'warning')
+
+        elif fqdn_type == 'internal_ssl':
+            try:
+                cert_pem, key_pem = generate_internal_cert(domain, forward_host)
+                cert_id = npm.upload_custom_cert(domain, cert_pem, key_pem)
+                if not cert_id:
+                    flash('Warning: failed to upload cert to NPM. Proxy created without SSL.', 'warning')
+            except Exception as e:
+                flash(f'Failed to generate internal cert: {e}', 'error')
+                return redirect(url_for('add_fqdn'))
 
         result = npm.create_proxy_host(domain, forward_host, forward_port,
                                        ssl=(cert_id > 0), cert_id=cert_id, force_ssl=force_ssl)
