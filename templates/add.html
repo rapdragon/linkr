@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Add FQDN — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>Add FQDN</h1>
+<form method="post" id="add-form">
+    <div class="form-group">
+        <label>Domain Name</label>
+        <input type="text" name="domain" placeholder="service.dragonfang.net" required>
+    </div>
+    <div class="form-group">
+        <label>DNS IP (Pi-hole points here)</label>
+        <input type="text" name="dns_ip" value="10.69.0.99">
+    </div>
+    <div class="form-group">
+        <label>Forward Host</label>
+        <input type="text" name="forward_host" placeholder="10.69.0.99" required>
+    </div>
+    <div class="form-group">
+        <label>Forward Port</label>
+        <input type="number" name="forward_port" placeholder="8080" required>
+    </div>
+    <div class="form-group">
+        <label>Type</label>
+        <select name="type" id="fqdn-type" onchange="toggleExternal()">
+            <option value="internal">Internal (HTTP only)</option>
+            <option value="external">External (Let's Encrypt SSL)</option>
+        </select>
+    </div>
+    <div class="form-group" id="ssl-options" style="display:none">
+        <label><input type="checkbox" name="force_ssl"> Force HTTPS redirect</label>
+    </div>
+    <div class="form-group">
+        <button type="submit" class="btn" id="submit-btn">Create</button>
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<div id="dns-modal" class="modal" style="display:none">
+    <div class="modal-content">
+        <h3>Public DNS Validation</h3>
+        <p id="dns-result"></p>
+        <button onclick="confirmCert()" class="btn">OK — Proceed</button>
+        <button onclick="cancelCert()" class="btn btn-secondary">Cancel</button>
+    </div>
+</div>
+
+<script>
+function toggleExternal() {
+    var type = document.getElementById('fqdn-type').value;
+    document.getElementById('ssl-options').style.display = type === 'external' ? 'block' : 'none';
+}
+
+document.getElementById('add-form').addEventListener('submit', function(e) {
+    var type = document.getElementById('fqdn-type').value;
+    if (type === 'external') {
+        e.preventDefault();
+        var domain = document.querySelector('input[name="domain"]').value;
+        fetch('/validate-dns?domain=' + encodeURIComponent(domain))
+            .then(r => r.json())
+            .then(data => {
+                var modal = document.getElementById('dns-modal');
+                var result = document.getElementById('dns-result');
+                if (data.resolved) {
+                    result.innerHTML = '<strong>' + domain + '</strong> resolves to <strong>' + data.ip + '</strong><br>Is this your public IP?';
+                } else {
+                    result.innerHTML = '<strong>' + domain + '</strong> does not resolve publicly.<br>Let\'s Encrypt cert will likely fail.';
+                }
+                modal.style.display = 'flex';
+            });
+    }
+});
+
+function confirmCert() {
+    document.getElementById('dns-modal').style.display = 'none';
+    document.getElementById('add-form').removeEventListener('submit', arguments.callee);
+    document.getElementById('submit-btn').click();
+    // Submit without validation
+    var form = document.getElementById('add-form');
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'validated';
+    input.value = '1';
+    form.appendChild(input);
+    form.submit();
+}
+
+function cancelCert() {
+    document.getElementById('dns-modal').style.display = 'none';
+}
+</script>
+{% endblock %}

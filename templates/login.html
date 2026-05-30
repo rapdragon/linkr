@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Login — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>Login</h1>
+<form method="post" class="auth-form">
+    <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" required autofocus>
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+    </div>
+    <button type="submit" class="btn">Login</button>
+</form>
+{% endblock %}

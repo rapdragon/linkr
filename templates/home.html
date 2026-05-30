@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}FQDN List — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>FQDN Mappings</h1>
+{% if session.role == 'admin' %}
+<a href="{{ url_for('add_fqdn') }}" class="btn">+ Add FQDN</a>
+{% endif %}
+<table>
+    <thead>
+        <tr>
+            <th>FQDN</th>
+            <th>DNS (Pi-hole)</th>
+            <th>Proxy (NPM)</th>
+            <th>Type</th>
+            <th>SSL</th>
+            {% if session.role == 'admin' %}<th>Actions</th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in entries %}
+        <tr>
+            <td>{{ e.domain }}</td>
+            <td>
+                {% if e.dns_ip %}
+                <span class="status-ok">✅ → {{ e.dns_ip }}</span>
+                {% else %}
+                <span class="status-missing">❌ Missing</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if e.proxy %}
+                <span class="status-ok">✅ → {{ e.forward_host }}:{{ e.forward_port }}</span>
+                {% else %}
+                <span class="status-missing">❌ Missing</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if e.ssl and e.ssl != 'None' %}External{% else %}Internal{% endif %}
+            </td>
+            <td>
+                {% if e.ssl and e.ssl != 'None' %}
+                {{ e.ssl }}{% if e.ssl_forced %} (forced){% endif %}
+                {% else %}
+                None
+                {% endif %}
+            </td>
+            {% if session.role == 'admin' %}
+            <td>
+                <form method="post" action="{{ url_for('delete_fqdn', domain=e.domain) }}" style="display:inline"
+                      onsubmit="return confirm('Delete {{ e.domain }} from both Pi-hole and NPM?')">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if not entries %}
+<p>No FQDNs configured. <a href="{{ url_for('add_fqdn') }}">Add one</a>.</p>
+{% endif %}
+{% endblock %}

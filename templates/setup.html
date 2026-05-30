@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Setup — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>Initial Setup</h1>
+<p>Create your admin account and configure connections.</p>
+<form method="post">
+    <h2>Admin Account</h2>
+    <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" required autofocus>
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required>
+    </div>
+
+    <h2>Pi-hole Connection</h2>
+    <div class="form-group">
+        <label>URL</label>
+        <input type="text" name="pihole_url" placeholder="http://10.69.0.99:20720">
+    </div>
+    <div class="form-group">
+        <label>API Password</label>
+        <input type="password" name="pihole_password">
+    </div>
+
+    <h2>NPM Connection</h2>
+    <div class="form-group">
+        <label>URL</label>
+        <input type="text" name="npm_url" placeholder="http://10.69.0.99:30020">
+    </div>
+    <div class="form-group">
+        <label>Email/Identity</label>
+        <input type="text" name="npm_identity">
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="npm_secret">
+    </div>
+
+    <button type="submit" class="btn">Complete Setup</button>
+</form>
+{% endblock %}

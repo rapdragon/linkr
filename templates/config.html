@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Config — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>Configuration</h1>
+<form method="post">
+    <h2>Pi-hole</h2>
+    <div class="form-group">
+        <label>URL</label>
+        <input type="text" name="pihole_url" value="{{ pihole_url }}" placeholder="http://10.69.0.99:20720">
+    </div>
+    <div class="form-group">
+        <label>API Password</label>
+        <input type="password" name="pihole_password" value="{{ pihole_password }}">
+    </div>
+    <div class="form-group">
+        <button type="submit" name="action" value="test_pihole" class="btn btn-secondary">Test Connection</button>
+    </div>
+
+    <h2>Nginx Proxy Manager</h2>
+    <div class="form-group">
+        <label>URL</label>
+        <input type="text" name="npm_url" value="{{ npm_url }}" placeholder="http://10.69.0.99:30020">
+    </div>
+    <div class="form-group">
+        <label>Email/Identity</label>
+        <input type="text" name="npm_identity" value="{{ npm_identity }}">
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="npm_secret" value="{{ npm_secret }}">
+    </div>
+    <div class="form-group">
+        <button type="submit" name="action" value="test_npm" class="btn btn-secondary">Test Connection</button>
+    </div>
+
+    <div class="form-group">
+        <button type="submit" name="action" value="save_connections" class="btn">Save All</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Users — DNS & Proxy Manager{% endblock %}
+{% block content %}
+<h1>Users</h1>
+<table>
+    <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.username }}</td>
+            <td>{{ user.role }}</td>
+            <td>
+                <form method="post" action="{{ url_for('change_password', user_id=user.id) }}" style="display:inline">
+                    <input type="password" name="password" placeholder="New password" required size="12">
+                    <button type="submit" class="btn btn-sm">Change</button>
+                </form>
+                <form method="post" action="{{ url_for('generate_api_key', user_id=user.id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-secondary">Gen API Key</button>
+                </form>
+                {% if user.id != session.user_id %}
+                <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline"
+                      onsubmit="return confirm('Delete user {{ user.username }}?')">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Add User</h2>
+<form method="post" action="{{ url_for('add_user') }}">
+    <div class="form-group">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <select name="role"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+        <button type="submit" class="btn">Add User</button>
+    </div>
+</form>
+{% endblock %}
