@@ -1,5 +1,5 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e url('/static/linkr.jpg') no-repeat center center fixed; background-size: cover; color: #e0e0e0; line-height: 1.6; }
 a { color: #4fc3f7; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -7,7 +7,7 @@ nav { background: #16213e; padding: 0.8rem 1.5rem; display: flex; gap: 1.5rem; a
 nav a { color: #4fc3f7; font-weight: 500; }
 .nav-right { margin-left: auto; font-size: 0.85rem; color: #999; }
 
-.container { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+.container { max-width: 1100px; margin: 2rem auto; padding: 1.5rem; background: rgba(26, 26, 46, 0.9); border-radius: 8px; }
 
 h1 { margin-bottom: 1rem; color: #fff; }
 h2 { margin: 1.5rem 0 0.5rem; color: #ccc; }
@@ -39,6 +39,7 @@ tr:hover { background: #1a2744; }
 
 .status-ok { color: #66bb6a; }
 .status-missing { color: #ef5350; }
+.status-na { color: #888; font-style: italic; }
 
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: #16213e; padding: 2rem; border-radius: 8px; max-width: 450px; width: 90%; }

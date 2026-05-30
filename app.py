@@ -314,6 +314,10 @@ def home():
         for d in h.get('domain_names', []):
             proxy_map[d] = h
 
+    # Get certificates for provider detection
+    certs = npm.get_certificates()
+    cert_map = {c['id']: c for c in certs}
+
     # Merge
     all_domains = sorted(set(list(dns_map.keys()) + list(proxy_map.keys())))
     entries = []
@@ -327,6 +331,7 @@ def home():
             'ssl': None,
             'ssl_forced': False,
             'cert_id': 0,
+            'is_external': False,
         }
         if entry['proxy']:
             entry['forward_host'] = entry['proxy'].get('forward_host')
@@ -334,7 +339,13 @@ def home():
             entry['cert_id'] = entry['proxy'].get('certificate_id', 0)
             entry['ssl_forced'] = entry['proxy'].get('ssl_forced', False)
             if entry['cert_id'] and entry['cert_id'] > 0:
-                entry['ssl'] = 'Let\'s Encrypt'
+                cert_info = cert_map.get(entry['cert_id'], {})
+                provider = cert_info.get('provider', 'other')
+                if provider == 'letsencrypt':
+                    entry['ssl'] = 'Let\'s Encrypt'
+                    entry['is_external'] = True
+                else:
+                    entry['ssl'] = 'Custom Cert'
             else:
                 entry['ssl'] = 'None'
         entries.append(entry)
@@ -361,10 +372,14 @@ def add_fqdn():
             return redirect(url_for('add_fqdn'))
 
         # Create DNS entry
-        pihole._auth()
-        if not pihole.add_host(dns_ip, domain):
-            flash('Failed to create DNS entry in Pi-hole', 'error')
-            return redirect(url_for('add_fqdn'))
+        if fqdn_type in ('internal', 'internal_ssl'):
+            pihole._auth()
+            if not pihole.add_host(dns_ip, domain):
+                flash('Failed to create DNS entry in Pi-hole', 'error')
+                return redirect(url_for('add_fqdn'))
+        elif fqdn_type == 'external' and request.form.get('add_local_dns') == 'on':
+            pihole._auth()
+            pihole.add_host(dns_ip, domain)
 
         # Create proxy host
         cert_id = 0
@@ -373,7 +388,6 @@ def add_fqdn():
             count, can_request = check_rate_limit(domain)
             if not can_request:
                 flash(f'Let\'s Encrypt rate limit reached ({count}/50 this week)', 'error')
-                pihole.delete_host(dns_ip, domain)
                 return redirect(url_for('add_fqdn'))
 
             # Request cert
@@ -419,6 +433,72 @@ def delete_fqdn(domain):
 
     flash(f'Deleted {domain}', 'success')
     return redirect(url_for('home'))
+
+
+@app.route('/edit/<domain>', methods=['GET', 'POST'])
+@admin_required
+def edit_fqdn(domain):
+    npm._auth()
+    pihole._auth()
+
+    # Get current proxy host
+    proxy_hosts = npm.get_proxy_hosts()
+    proxy = None
+    for h in proxy_hosts:
+        if domain in h.get('domain_names', []):
+            proxy = h
+            break
+
+    # Get current DNS
+    dns_hosts = pihole.get_hosts()
+    dns_ip = None
+    for entry in dns_hosts:
+        parts = entry.split(' ', 1)
+        if len(parts) == 2 and parts[1] == domain:
+            dns_ip = parts[0]
+            break
+
+    if request.method == 'POST':
+        forward_host = request.form['forward_host'].strip()
+        forward_port = request.form['forward_port'].strip()
+        force_ssl = request.form.get('force_ssl') == 'on'
+        new_dns_ip = request.form.get('dns_ip', '').strip()
+
+        # Update proxy host
+        if proxy:
+            updates = {
+                'domain_names': [domain],
+                'forward_scheme': 'http',
+                'forward_host': forward_host,
+                'forward_port': int(forward_port),
+                'certificate_id': proxy.get('certificate_id', 0),
+                'ssl_forced': force_ssl,
+                'http2_support': proxy.get('http2_support', False),
+                'hsts_enabled': proxy.get('hsts_enabled', False),
+                'hsts_subdomains': proxy.get('hsts_subdomains', False),
+                'block_exploits': proxy.get('block_exploits', False),
+                'caching_enabled': proxy.get('caching_enabled', False),
+                'allow_websocket_upgrade': proxy.get('allow_websocket_upgrade', True),
+                'access_list_id': proxy.get('access_list_id', 0),
+                'locations': proxy.get('locations') or [],
+                'advanced_config': proxy.get('advanced_config', '')
+            }
+            npm.update_proxy_host(proxy['id'], updates)
+
+        # Update DNS
+        if new_dns_ip:
+            # Remove old entry if exists
+            if dns_ip:
+                pihole.delete_host(dns_ip, domain)
+            pihole.add_host(new_dns_ip, domain)
+        elif dns_ip and not new_dns_ip:
+            # Remove DNS if cleared
+            pihole.delete_host(dns_ip, domain)
+
+        flash(f'Updated {domain}', 'success')
+        return redirect(url_for('home'))
+
+    return render_template('edit.html', domain=domain, proxy=proxy, dns_ip=dns_ip)
 
 
 @app.route('/validate-dns')
@@ -658,9 +738,11 @@ def api_create_fqdn():
     if npm.domain_exists(domain):
         return jsonify({'error': f'Domain {domain} already exists in NPM'}), 409
 
-    pihole._auth()
-    if not pihole.add_host(dns_ip, domain):
-        return jsonify({'error': 'Failed to create DNS entry'}), 500
+    # Internal: create DNS entry. External: skip (uses public DNS)
+    if fqdn_type == 'internal':
+        pihole._auth()
+        if not pihole.add_host(dns_ip, domain):
+            return jsonify({'error': 'Failed to create DNS entry'}), 500
 
     cert_id = 0
     if fqdn_type == 'external':

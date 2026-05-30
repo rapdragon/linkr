@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.0] - 2026-05-30
+
+### Added
+- Edit page for existing FQDNs (change forward host/port, DNS IP, SSL forced)
+- Custom cert detection — distinguishes Let's Encrypt from custom/internal CA certs
+- "Internal (Custom Cert)" type option when adding domains
+- Split DNS support — external domains can optionally add Pi-hole entry for local resolution
+- REST API with API key authentication (generate in Users tab)
+- API key generation button on Users page
+
+### Changed
+- External domains no longer require Pi-hole entry (optional via checkbox)
+- DNS-only entries (no proxy) no longer flagged as errors
+- Removed fix buttons — edit page handles all modifications
+- Browser tab titles now show "Linkr"
+- Custom background image and favicon
+
+### Fixed
+- Public DNS validation popup JS cleanup
+
 ## [1.0.0] - 2026-05-30
 
 ### Added

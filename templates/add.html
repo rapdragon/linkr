@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Add FQDN — DNS & Proxy Manager{% endblock %}
+{% block title %}Linkr — Add{% endblock %}
 {% block content %}
 <h1>Add FQDN</h1>
 <form method="post" id="add-form">
@@ -21,13 +21,16 @@
     </div>
     <div class="form-group">
         <label>Type</label>
-        <select name="type" id="fqdn-type" onchange="toggleExternal()">
+        <select name="type" id="fqdn-type" onchange="toggleType()">
             <option value="internal">Internal (HTTP only)</option>
+            <option value="internal_ssl">Internal (Custom Cert)</option>
             <option value="external">External (Let's Encrypt SSL)</option>
         </select>
     </div>
     <div class="form-group" id="ssl-options" style="display:none">
         <label><input type="checkbox" name="force_ssl"> Force HTTPS redirect</label>
+        <br>
+        <label><input type="checkbox" name="add_local_dns" checked> Also add local DNS in Pi-hole (split DNS — resolves locally)</label>
     </div>
     <div class="form-group">
         <button type="submit" class="btn" id="submit-btn">Create</button>
@@ -45,9 +48,9 @@
 </div>
 
 <script>
-function toggleExternal() {
+function toggleType() {
     var type = document.getElementById('fqdn-type').value;
-    document.getElementById('ssl-options').style.display = type === 'external' ? 'block' : 'none';
+    document.getElementById('ssl-options').style.display = (type === 'external' || type === 'internal_ssl') ? 'block' : 'none';
 }
 
 document.getElementById('add-form').addEventListener('submit', function(e) {
@@ -72,9 +75,6 @@ document.getElementById('add-form').addEventListener('submit', function(e) {
 
 function confirmCert() {
     document.getElementById('dns-modal').style.display = 'none';
-    document.getElementById('add-form').removeEventListener('submit', arguments.callee);
-    document.getElementById('submit-btn').click();
-    // Submit without validation
     var form = document.getElementById('add-form');
     var input = document.createElement('input');
     input.type = 'hidden';

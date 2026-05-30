@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}FQDN List — DNS & Proxy Manager{% endblock %}
+{% block title %}Linkr{% endblock %}
 {% block content %}
 <h1>FQDN Mappings</h1>
 {% if session.role == 'admin' %}
@@ -24,18 +24,18 @@
                 {% if e.dns_ip %}
                 <span class="status-ok">✅ → {{ e.dns_ip }}</span>
                 {% else %}
-                <span class="status-missing">❌ Missing</span>
+                <span class="status-na">— None</span>
                 {% endif %}
             </td>
             <td>
                 {% if e.proxy %}
                 <span class="status-ok">✅ → {{ e.forward_host }}:{{ e.forward_port }}</span>
                 {% else %}
-                <span class="status-missing">❌ Missing</span>
+                <span class="status-na">— None</span>
                 {% endif %}
             </td>
             <td>
-                {% if e.ssl and e.ssl != 'None' %}External{% else %}Internal{% endif %}
+                {% if e.is_external %}External{% else %}Internal{% endif %}
             </td>
             <td>
                 {% if e.ssl and e.ssl != 'None' %}
@@ -46,8 +46,9 @@
             </td>
             {% if session.role == 'admin' %}
             <td>
+                <a href="{{ url_for('edit_fqdn', domain=e.domain) }}" class="btn btn-sm btn-secondary">Edit</a>
                 <form method="post" action="{{ url_for('delete_fqdn', domain=e.domain) }}" style="display:inline"
-                      onsubmit="return confirm('Delete {{ e.domain }} from both Pi-hole and NPM?')">
+                      onsubmit="return confirm('Delete {{ e.domain }}?')">
                     <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                 </form>
             </td>

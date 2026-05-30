@@ -6,8 +6,11 @@ DNS & Proxy Manager — a single web UI to manage FQDNs across Pi-hole (DNS) and
 
 - **Unified view** — see all FQDNs with their DNS and proxy status in one table
 - **One-click creation** — creates both Pi-hole DNS entry + NPM proxy host together
+- **Edit existing entries** — change forward target, DNS IP, SSL settings
 - **Mismatch detection** — flags entries that exist in one system but not the other
+- **Split DNS** — external domains can optionally resolve locally via Pi-hole
 - **Let's Encrypt** — auto-requests SSL certs for external domains with public DNS validation
+- **Custom cert support** — detects and displays internal CA certs vs Let's Encrypt
 - **Rate limit tracking** — tracks LE cert requests to avoid hitting the 50/week limit
 - **Duplicate prevention** — validates domain doesn't already exist before creating
 - **User auth** — login required, admin/viewer roles

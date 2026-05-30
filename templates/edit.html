@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Linkr — Edit{% endblock %}
+{% block content %}
+<h1>Edit: {{ domain }}</h1>
+<form method="post">
+    <div class="form-group">
+        <label>Forward Host</label>
+        <input type="text" name="forward_host" value="{{ proxy.forward_host if proxy else '' }}" required>
+    </div>
+    <div class="form-group">
+        <label>Forward Port</label>
+        <input type="number" name="forward_port" value="{{ proxy.forward_port if proxy else '' }}" required>
+    </div>
+    <div class="form-group">
+        <label>Local DNS (Pi-hole) — leave blank to remove</label>
+        <input type="text" name="dns_ip" value="{{ dns_ip or '' }}" placeholder="10.69.0.99">
+        <small style="color:#888">Add a local IP so internal devices resolve locally instead of going through the router</small>
+    </div>
+    {% if proxy and proxy.certificate_id %}
+    <div class="form-group">
+        <label><input type="checkbox" name="force_ssl" {{ 'checked' if proxy.ssl_forced else '' }}> Force HTTPS redirect</label>
+    </div>
+    {% endif %}
+    <div class="form-group">
+        <button type="submit" class="btn">Save</button>
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
