@@ -16,11 +16,18 @@
         <input type="text" name="dns_ip" value="{{ dns_ip or '' }}" placeholder="10.69.0.99">
         <small style="color:#888">Add a local IP so internal devices resolve locally instead of going through the router</small>
     </div>
-    {% if proxy and proxy.certificate_id %}
     <div class="form-group">
-        <label><input type="checkbox" name="force_ssl" {{ 'checked' if proxy.ssl_forced else '' }}> Force HTTPS redirect</label>
+        <label>SSL Certificate</label>
+        <select name="cert_action">
+            <option value="keep" selected>Keep current{% if proxy and proxy.certificate_id %} (ID: {{ proxy.certificate_id }}){% else %} (None){% endif %}</option>
+            <option value="internal">Generate Internal CA cert</option>
+            <option value="letsencrypt">Request Let's Encrypt cert</option>
+            <option value="remove">Remove certificate</option>
+        </select>
     </div>
-    {% endif %}
+    <div class="form-group">
+        <label><input type="checkbox" name="force_ssl" {{ 'checked' if proxy and proxy.ssl_forced else '' }}> Force HTTPS redirect</label>
+    </div>
     <div class="form-group">
         <button type="submit" class="btn">Save</button>
         <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>

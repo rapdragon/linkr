@@ -260,11 +260,7 @@ class NPMAPI:
         data = {
             'provider': 'letsencrypt',
             'domain_names': [domain],
-            'meta': {
-                'letsencrypt_email': get_config('npm_identity', ''),
-                'letsencrypt_agree': True,
-                'dns_challenge': False
-            }
+            'meta': {}
         }
         r = self._request('POST', '/api/nginx/certificates', json=data)
         return r.json() if r.ok else None
@@ -460,6 +456,20 @@ def add_fqdn():
         force_ssl = request.form.get('force_ssl') == 'on'
         dns_ip = request.form.get('dns_ip', '10.69.0.99').strip()
 
+        # Validate domain
+        if not domain:
+            flash('Domain name is required', 'error')
+            return redirect(url_for('add_fqdn'))
+
+        # Validate port
+        try:
+            port_int = int(forward_port)
+            if port_int < 1 or port_int > 65535:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash('Port must be a number between 1 and 65535', 'error')
+            return redirect(url_for('add_fqdn'))
+
         # Duplicate check
         npm._auth()
         existing = npm.domain_exists(domain)
@@ -569,6 +579,43 @@ def edit_fqdn(domain):
         forward_port = request.form['forward_port'].strip()
         force_ssl = request.form.get('force_ssl') == 'on'
         new_dns_ip = request.form.get('dns_ip', '').strip()
+        cert_action = request.form.get('cert_action', 'keep')
+
+        # Validate port
+        try:
+            port_int = int(forward_port)
+            if port_int < 1 or port_int > 65535:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash('Port must be a number between 1 and 65535', 'error')
+            return redirect(url_for('edit_fqdn', domain=domain))
+
+        # Handle cert action
+        cert_id = proxy.get('certificate_id', 0) if proxy else 0
+        if cert_action == 'internal':
+            try:
+                cert_pem, key_pem = generate_internal_cert(domain, forward_host)
+                cert_id = npm.upload_custom_cert(domain, cert_pem, key_pem)
+                if not cert_id:
+                    flash('Failed to upload cert to NPM', 'error')
+                    return redirect(url_for('edit_fqdn', domain=domain))
+            except Exception as e:
+                flash(f'Failed to generate internal cert: {e}', 'error')
+                return redirect(url_for('edit_fqdn', domain=domain))
+        elif cert_action == 'letsencrypt':
+            count, can_request = check_rate_limit(domain)
+            if not can_request:
+                flash(f'LE rate limit reached ({count}/50 this week)', 'error')
+                return redirect(url_for('edit_fqdn', domain=domain))
+            cert = npm.request_le_cert(domain)
+            if cert and 'id' in cert:
+                cert_id = cert['id']
+                record_cert_request(domain)
+            else:
+                flash('Failed to request Let\'s Encrypt cert', 'error')
+                return redirect(url_for('edit_fqdn', domain=domain))
+        elif cert_action == 'remove':
+            cert_id = 0
 
         # Update proxy host
         if proxy:
@@ -576,8 +623,8 @@ def edit_fqdn(domain):
                 'domain_names': [domain],
                 'forward_scheme': 'http',
                 'forward_host': forward_host,
-                'forward_port': int(forward_port),
-                'certificate_id': proxy.get('certificate_id', 0),
+                'forward_port': port_int,
+                'certificate_id': cert_id,
                 'ssl_forced': force_ssl,
                 'http2_support': proxy.get('http2_support', False),
                 'hsts_enabled': proxy.get('hsts_enabled', False),
@@ -869,6 +916,14 @@ def api_create_fqdn():
 
     if not domain or not forward_host or not forward_port:
         return jsonify({'error': 'domain, forward_host, and forward_port required'}), 400
+
+    # Validate port
+    try:
+        port_int = int(forward_port)
+        if port_int < 1 or port_int > 65535:
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({'error': 'forward_port must be a number between 1 and 65535'}), 400
 
     npm._auth()
     if npm.domain_exists(domain):
