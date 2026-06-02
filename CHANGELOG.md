@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-06-01
+
+### Added
+- Edit page: add/change/remove SSL certificates on existing entries
+- Certificate options: Internal CA, Let's Encrypt, or Remove
+- Server-side port validation (must be 1–65535) on web form and API
+- Server-side domain validation (required, non-empty)
+- Force SSL checkbox always visible on edit (not just when cert exists)
+
+### Fixed
+- `request_le_cert()`: NPM API no longer accepts `letsencrypt_email`, `letsencrypt_agree`, `dns_challenge` in meta — now sends `"meta": {}`
+- Non-numeric port input no longer causes 500 error
+- Out-of-range port (e.g. 99999) no longer silently accepted
+
 ## [1.2.0] - 2026-05-30
 
 ### Added

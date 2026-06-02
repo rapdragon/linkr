@@ -6,7 +6,7 @@ DNS & Proxy Manager — a single web UI to manage FQDNs across Pi-hole (DNS) and
 
 - **Unified view** — see all FQDNs with their DNS and proxy status in one table
 - **One-click creation** — creates both Pi-hole DNS entry + NPM proxy host together
-- **Edit existing entries** — change forward target, DNS IP, SSL settings
+- **Edit existing entries** — change forward target, DNS IP, add/remove certs, toggle SSL
 - **Mismatch detection** — flags entries that exist in one system but not the other
 - **Split DNS** — external domains can optionally resolve locally via Pi-hole
 - **Let's Encrypt** — auto-requests SSL certs for external domains with public DNS validation
@@ -24,6 +24,8 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -v linkr-data:/data \
+  -v /path/to/ca:/ca:ro \
+  -v /path/to/npm/custom_ssl:/npm_certs \
   rapdragon/linkr:latest
 ```
 
@@ -91,6 +93,8 @@ curl http://localhost:5000/api/fqdns \
 |----------|---------|-------------|
 | `SECRET_KEY` | random | Flask session secret |
 | `DB_PATH` | `/data/dns_proxy_manager.db` | SQLite database path |
+| `CA_PATH` | `/ca` | Path to CA cert/key for internal cert generation |
+| `NPM_CERTS_PATH` | `/npm_certs` | Path to NPM custom_ssl directory |
 | `DEBUG` | `false` | Enable debug mode |
 
 ## Tech Stack
