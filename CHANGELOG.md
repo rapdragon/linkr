@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0] - 2026-06-05
+
+### Added
+- Docker Swarm support: after any NPM write (create/edit/delete), Linkr force-reloads all NPM service replicas via the Docker socket to prevent stale nginx config on non-updated replicas
+- Config page: optional "Docker Swarm Service Name" field (e.g. `npm_npm`) — leave blank to disable swarm reload
+- Requires `/var/run/docker.sock` mounted into the Linkr container when using swarm mode
+
 ## [1.3.0] - 2026-06-01
 
 ### Added

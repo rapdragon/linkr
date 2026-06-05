@@ -32,6 +32,10 @@
     <div class="form-group">
         <button type="submit" name="action" value="test_npm" class="btn btn-secondary">Test Connection</button>
     </div>
+    <div class="form-group">
+        <label>Docker Swarm Service Name <small>(optional — force-reloads all replicas after changes)</small></label>
+        <input type="text" name="npm_swarm_service" value="{{ npm_swarm_service }}" placeholder="npm_npm">
+    </div>
 
     <div class="form-group">
         <button type="submit" name="action" value="save_connections" class="btn">Save All</button>

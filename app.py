@@ -1,4 +1,4 @@
-import os, sqlite3, secrets, time, socket, datetime
+import os, sqlite3, secrets, time, socket, datetime, http.client, json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import requests as req
@@ -77,6 +77,52 @@ def set_config(key, value):
     db.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (key, value))
     db.commit()
     db.close()
+
+
+# --- Docker Swarm Reload ---
+
+class _UnixSocketHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, socket_path):
+        super().__init__('localhost')
+        self._socket_path = socket_path
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(self._socket_path)
+
+
+def swarm_reload():
+    """Force-reload NPM swarm replicas after a config change. Silent no-op if not configured."""
+    service_name = get_config('npm_swarm_service', '')
+    if not service_name:
+        return
+    sock_path = '/var/run/docker.sock'
+    if not os.path.exists(sock_path):
+        app.logger.warning('Docker socket not found — swarm reload skipped')
+        return
+    try:
+        conn = _UnixSocketHTTPConnection(sock_path)
+        conn.request('GET', f'/services?filters={json.dumps({"name": [service_name]})}')
+        resp = conn.getresponse()
+        services = json.loads(resp.read())
+        if not services:
+            app.logger.warning(f'Swarm service {service_name!r} not found')
+            return
+        svc = services[0]
+        svc_id = svc['ID']
+        version = svc['Version']['Index']
+        spec = svc['Spec']
+        spec.setdefault('TaskTemplate', {})
+        spec['TaskTemplate']['ForceUpdate'] = spec['TaskTemplate'].get('ForceUpdate', 0) + 1
+        body = json.dumps(spec).encode()
+        conn = _UnixSocketHTTPConnection(sock_path)
+        conn.request('POST', f'/services/{svc_id}/update?version={version}', body=body,
+                     headers={'Content-Type': 'application/json'})
+        resp = conn.getresponse()
+        resp.read()
+        app.logger.info(f'Swarm reload triggered for {service_name} (HTTP {resp.status})')
+    except Exception as e:
+        app.logger.error(f'Swarm reload failed: {e}')
 
 
 # --- Auth ---
@@ -517,6 +563,7 @@ def add_fqdn():
         result = npm.create_proxy_host(domain, forward_host, forward_port,
                                        ssl=(cert_id > 0), cert_id=cert_id, force_ssl=force_ssl)
         if result:
+            swarm_reload()
             flash(f'Created {domain} successfully', 'success')
         else:
             flash('Failed to create proxy host in NPM', 'error')
@@ -547,6 +594,7 @@ def delete_fqdn(domain):
             pihole.delete_host(parts[0], domain)
             break
 
+    swarm_reload()
     flash(f'Deleted {domain}', 'success')
     return redirect(url_for('home'))
 
@@ -637,6 +685,7 @@ def edit_fqdn(domain):
                 'advanced_config': proxy.get('advanced_config', '')
             }
             npm.update_proxy_host(proxy['id'], updates)
+            swarm_reload()
 
         # Update DNS
         if new_dns_ip:
@@ -679,6 +728,7 @@ def config_page():
             set_config('npm_url', request.form['npm_url'].strip())
             set_config('npm_identity', request.form['npm_identity'].strip())
             set_config('npm_secret', request.form['npm_secret'].strip())
+            set_config('npm_swarm_service', request.form.get('npm_swarm_service', '').strip())
             flash('Connections saved', 'success')
         elif action == 'test_pihole':
             set_config('pihole_url', request.form['pihole_url'].strip())
@@ -702,7 +752,8 @@ def config_page():
                            pihole_password=get_config('pihole_password', ''),
                            npm_url=get_config('npm_url', ''),
                            npm_identity=get_config('npm_identity', ''),
-                           npm_secret=get_config('npm_secret', ''))
+                           npm_secret=get_config('npm_secret', ''),
+                           npm_swarm_service=get_config('npm_swarm_service', ''))
 
 
 @app.route('/config/users')
