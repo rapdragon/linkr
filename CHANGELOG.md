@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] - 2026-06-05
+
+### Fixed
+- `upload_custom_cert()`: cert files now written to the NPM Docker volume (`NPM_CERTS_PATH` env, default `/npm_certs`) — container must mount the NPM `custom_ssl` volume at that path
+- `upload_custom_cert()`: fullchain.pem now correctly separated with newlines between cert and CA cert, preventing nginx `bad end line` PEM parse failure
+
 ## [1.4.0] - 2026-06-05
 
 ### Added

@@ -340,17 +340,20 @@ class NPMAPI:
         cert_id = cert_data.get('id')
         if not cert_id:
             return None
-        # Write cert files to NPM custom_ssl directory
-        cert_dir = os.path.join(os.environ.get('NPM_CERTS_PATH', '/npm_certs'), f'npm-{cert_id}')
+        # Write cert files to NPM custom_ssl volume directory
+        npm_certs_path = os.environ.get('NPM_CERTS_PATH', '/npm_certs')
+        cert_dir = os.path.join(npm_certs_path, f'npm-{cert_id}')
         os.makedirs(cert_dir, exist_ok=True)
         ca_path = os.environ.get('CA_PATH', '/ca')
         ca_cert = open(os.path.join(ca_path, 'ca.crt')).read()
+        # Ensure clean newline separation between cert and CA cert
+        fullchain = cert_pem.rstrip('\n') + '\n' + ca_cert.rstrip('\n') + '\n'
         with open(os.path.join(cert_dir, 'fullchain.pem'), 'w') as f:
-            f.write(cert_pem + ca_cert)
+            f.write(fullchain)
         with open(os.path.join(cert_dir, 'chain.pem'), 'w') as f:
-            f.write(ca_cert)
+            f.write(ca_cert.rstrip('\n') + '\n')
         with open(os.path.join(cert_dir, 'privkey.pem'), 'w') as f:
-            f.write(key_pem)
+            f.write(key_pem.rstrip('\n') + '\n')
         return cert_id
 
     def test_connection(self):
