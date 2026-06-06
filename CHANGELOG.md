@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2] - 2026-06-06
+
+### Added
+- `PATCH /api/fqdns/<domain>` — edit an existing FQDN via API (forward_host, forward_port, force_ssl, dns_ip, cert_action); all fields optional, unspecified fields keep current values
+- `PATCH` supports `cert_action: "internal"` to generate and upload an internal CA cert, or `"remove"` to strip the cert
+- `POST /api/fqdns` supports `type: "internal_cert"` to create a proxy host with an internal CA cert in one step
+- `POST` response now includes `cert_id` when a cert was created
+
 ## [1.4.1] - 2026-06-05
 
 ### Fixed

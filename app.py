@@ -983,8 +983,8 @@ def api_create_fqdn():
     if npm.domain_exists(domain):
         return jsonify({'error': f'Domain {domain} already exists in NPM'}), 409
 
-    # Internal: create DNS entry. External: skip (uses public DNS)
-    if fqdn_type == 'internal':
+    # Internal: create DNS entry. External/internal_cert: skip (uses public DNS or existing)
+    if fqdn_type in ('internal', 'internal_cert'):
         pihole._auth()
         if not pihole.add_host(dns_ip, domain):
             return jsonify({'error': 'Failed to create DNS entry'}), 500
@@ -998,11 +998,20 @@ def api_create_fqdn():
         if cert and 'id' in cert:
             cert_id = cert['id']
             record_cert_request(domain)
+    elif fqdn_type == 'internal_cert':
+        try:
+            cert_pem, key_pem = generate_internal_cert(domain, forward_host)
+            cert_id = npm.upload_custom_cert(domain, cert_pem, key_pem)
+            if not cert_id:
+                return jsonify({'error': 'Failed to upload internal cert to NPM'}), 500
+        except Exception as e:
+            return jsonify({'error': f'Failed to generate internal cert: {e}'}), 500
 
     result = npm.create_proxy_host(domain, forward_host, forward_port,
                                    ssl=(cert_id > 0), cert_id=cert_id, force_ssl=force_ssl)
     if result:
-        return jsonify({'success': True, 'domain': domain, 'proxy_id': result.get('id')}), 201
+        return jsonify({'success': True, 'domain': domain, 'proxy_id': result.get('id'),
+                        'cert_id': cert_id}), 201
     return jsonify({'error': 'Failed to create proxy host'}), 500
 
 
@@ -1028,6 +1037,88 @@ def api_delete_fqdn(domain):
             break
 
     return jsonify({'success': True, 'deleted': domain})
+
+
+@app.route('/api/fqdns/<domain>', methods=['PATCH'])
+@api_key_required
+def api_edit_fqdn(domain):
+    if request.api_permission != 'full':
+        return jsonify({'error': 'API key does not have write permission'}), 403
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'JSON body required'}), 400
+
+    npm._auth()
+    pihole._auth()
+
+    proxy_hosts = npm.get_proxy_hosts()
+    proxy = next((h for h in proxy_hosts if domain in h.get('domain_names', [])), None)
+    if not proxy:
+        return jsonify({'error': f'Domain {domain} not found in NPM'}), 404
+
+    forward_host = data.get('forward_host', proxy.get('forward_host')).strip()
+    force_ssl = data.get('force_ssl', proxy.get('ssl_forced', False))
+    dns_ip = data.get('dns_ip')
+
+    if 'forward_port' in data:
+        try:
+            forward_port = int(data['forward_port'])
+            if forward_port < 1 or forward_port > 65535:
+                raise ValueError
+        except (ValueError, TypeError):
+            return jsonify({'error': 'forward_port must be a number between 1 and 65535'}), 400
+    else:
+        forward_port = proxy.get('forward_port')
+
+    cert_id = proxy.get('certificate_id', 0)
+    cert_action = data.get('cert_action')
+    if cert_action == 'internal':
+        try:
+            cert_pem, key_pem = generate_internal_cert(domain, forward_host)
+            cert_id = npm.upload_custom_cert(domain, cert_pem, key_pem)
+            if not cert_id:
+                return jsonify({'error': 'Failed to upload internal cert to NPM'}), 500
+        except Exception as e:
+            return jsonify({'error': f'Failed to generate internal cert: {e}'}), 500
+    elif cert_action == 'remove':
+        cert_id = 0
+
+    updates = {
+        'domain_names': [domain],
+        'forward_scheme': 'http',
+        'forward_host': forward_host,
+        'forward_port': forward_port,
+        'certificate_id': cert_id,
+        'ssl_forced': force_ssl,
+        'http2_support': proxy.get('http2_support', False),
+        'hsts_enabled': proxy.get('hsts_enabled', False),
+        'hsts_subdomains': proxy.get('hsts_subdomains', False),
+        'block_exploits': proxy.get('block_exploits', False),
+        'caching_enabled': proxy.get('caching_enabled', False),
+        'allow_websocket_upgrade': proxy.get('allow_websocket_upgrade', True),
+        'access_list_id': proxy.get('access_list_id', 0),
+        'locations': proxy.get('locations') or [],
+        'advanced_config': proxy.get('advanced_config', '')
+    }
+    npm.update_proxy_host(proxy['id'], updates)
+    swarm_reload()
+
+    if dns_ip is not None:
+        dns_hosts = pihole.get_hosts()
+        old_ip = None
+        for entry in dns_hosts:
+            parts = entry.split(' ', 1)
+            if len(parts) == 2 and parts[1] == domain:
+                old_ip = parts[0]
+                break
+        if old_ip:
+            pihole.delete_host(old_ip, domain)
+        if dns_ip:
+            pihole.add_host(dns_ip, domain)
+
+    return jsonify({'success': True, 'domain': domain,
+                    'forward_host': forward_host, 'forward_port': forward_port,
+                    'cert_id': cert_id})
 
 
 if __name__ == '__main__':
