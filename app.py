@@ -503,7 +503,7 @@ def add_fqdn():
         forward_port = request.form['forward_port'].strip()
         fqdn_type = request.form['type']
         force_ssl = request.form.get('force_ssl') == 'on'
-        dns_ip = request.form.get('dns_ip', '10.69.0.99').strip()
+        dns_ip = request.form.get('dns_ip', '').strip()
 
         # Validate domain
         if not domain:
@@ -526,13 +526,13 @@ def add_fqdn():
             flash(f'Domain {domain} already exists in NPM (ID: {existing})', 'error')
             return redirect(url_for('add_fqdn'))
 
-        # Create DNS entry
-        if fqdn_type in ('internal', 'internal_ssl'):
+        # Create DNS entry (skip if dns_ip is empty)
+        if dns_ip and fqdn_type in ('internal', 'internal_ssl'):
             pihole._auth()
             if not pihole.add_host(dns_ip, domain):
                 flash('Failed to create DNS entry in Pi-hole', 'error')
                 return redirect(url_for('add_fqdn'))
-        elif fqdn_type == 'external' and request.form.get('add_local_dns') == 'on':
+        elif dns_ip and fqdn_type == 'external' and request.form.get('add_local_dns') == 'on':
             pihole._auth()
             pihole.add_host(dns_ip, domain)
 

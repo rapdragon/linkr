@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.3] - 2026-06-24
+
+### Fixed
+- DNS IP field no longer defaults to `10.69.0.99` — now empty by default
+- Empty DNS IP is allowed (skips Pi-hole entry creation) for externally-resolving FQDNs
+
+### Changed
+- Add FQDN page: label updated to "DNS IP (Pi-hole points here — if using NPM, point to 10.69.0.100)"
+- Add FQDN page: DNS IP field uses placeholder text instead of pre-filled value
+
 ## [1.4.2] - 2026-06-06
 
 ### Added
