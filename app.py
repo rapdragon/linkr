@@ -863,6 +863,8 @@ def setup():
             set_config('npm_url', request.form['npm_url'].strip())
             set_config('npm_identity', request.form['npm_identity'].strip())
             set_config('npm_secret', request.form['npm_secret'].strip())
+        if request.form.get('swarm_service'):
+            set_config('swarm_service', request.form['swarm_service'].strip())
 
         flash('Setup complete! Please log in.', 'success')
         return redirect(url_for('login'))
